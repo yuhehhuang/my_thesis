@@ -1,9 +1,10 @@
 import networkx as nx
 from networkx.algorithms.simple_paths import shortest_simple_paths
 
-#需要user_id,date_rate(constant),sat_load,begin,end
+#需要user_id,date_rate(constant),sat_load,begin,end 
+##每個time slot最多兩顆candiate衛星
 def build_graph_for_yens(access_matrix, user_id, data_rate_dict, sat_load_dict,
-                            t_start, t_end, LAMBDA=10000):
+                            t_start, t_end, LAMBDA=1000000):
     G = nx.DiGraph()
 
     for t in range(t_start, min(t_end, len(access_matrix) - 1)):
@@ -28,7 +29,7 @@ def build_graph_for_yens(access_matrix, user_id, data_rate_dict, sat_load_dict,
                 L = sat_load_dict.get((s2, t+1), 0)
                 reward = (1 - L) * c_t1
                 if reward > 0:
-                    weight = LAMBDA - reward
+                    weight = max(LAMBDA - reward, 0)  # 確保非負
                     G.add_edge((s1, t), (s2, t+1),
                                weight=weight,
                                raw_reward=reward)

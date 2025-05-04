@@ -25,4 +25,4 @@ def compute_data_rate(sat_pos_km, user_pos_km,
     capacity_bps = bandwidth_Hz * np.log2(1 + SNR_linear)
     capacity_mbps = capacity_bps / 1e6
 
-    return max(0.1, min(capacity_mbps, 100.0))
+    return capacity_mbps

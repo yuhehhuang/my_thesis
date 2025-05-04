@@ -7,15 +7,11 @@ import yens_algo
 import pickle
 from collections import defaultdict
 import performance_calculate
-def load_satellite_names_from_csv(csv_path):
-    df = pd.read_csv(csv_path)
-    df["visible_sats"] = df["visible_sats"].apply(ast.literal_eval)
-    all_sats = set()
-    for sats in df["visible_sats"]:
-        all_sats.update(sats)
-    return sorted(list(all_sats))
+with open("data/data_rate_dict.pkl", "rb") as f:
+    data_rate_dict = pickle.load(f)
 
-satellites = load_satellite_names_from_csv("access_matrix.csv")
-print(len(satellites)) #1026
-for k in list(sat_load_dict.keys())[:10]:
-    print(k, sat_load_dict[k])
+print("✅ 總共有 keys:", len(data_rate_dict))
+print("🔍 隨機挑幾個 keys：")
+for i, key in enumerate(data_rate_dict):
+    if i < 20:
+        print(key)

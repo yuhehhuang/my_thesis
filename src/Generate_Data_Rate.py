@@ -1,25 +1,30 @@
 import pandas as pd
 import pickle
 from skyfield.api import load, wgs84
-from compute_data_rate import compute_data_rate  # 你必須先有這個函式
+from numpy.linalg import norm
 import ast
 
+def compute_data_rate(sat_pos, user_pos):
+    distance = norm(sat_pos - user_pos)
+    if distance > 2000:
+        return 0
+    return max(10, 3000 / (distance + 1))
+
 # === 載入資料 ===
-user_df = pd.read_csv("user_info_with_Ks.csv")  # 需包含 user_id, lat, lon
-access_df = pd.read_csv("access_matrix.csv")
+user_df = pd.read_csv("data/user_info_with_Ks.csv")
+access_df = pd.read_csv("data/access_matrix.csv")
 access_df["visible_sats"] = access_df["visible_sats"].apply(ast.literal_eval)
 access_matrix = access_df.to_dict("records")
 
-with open("satellite_positions.pkl", "rb") as f:
+with open("data/satellite_positions.pkl", "rb") as f:
     satellite_positions = pickle.load(f)
 
 # === Skyfield 時間軸 ===
 ts = load.timescale()
-START_TIME = ts.utc(2025, 4, 21, 0, 0, 0)
 SLOTS = len(access_matrix)
 times = [ts.utc(2025, 4, 21, 0, i, 0) for i in range(SLOTS)]
 
-# === 準備使用者位置 ===
+# === 使用者位置
 user_locations = {}
 for _, row in user_df.iterrows():
     user_id = row["user_id"]
@@ -27,23 +32,33 @@ for _, row in user_df.iterrows():
     lon = row["lon"]
     user_locations[user_id] = [wgs84.latlon(lat, lon).at(t).position.km for t in times]
 
-# === 建立 data_rate_dict ===
-data_rate_dict = {}
+# === 建立兩種 dict
+data_rate_dict_user = {}  # (sat, user_id, t) → float (for Yens)
+data_rate_dict_avg = {}   # (t, sat) → avg float   (for DP)
 
 for t_idx in range(SLOTS):
     visible_sats = access_matrix[t_idx]["visible_sats"]
-    for user_id in user_locations:
-        user_pos = user_locations[user_id][t_idx]
-        for sat in visible_sats:
-            key = (sat, t_idx)
-            if key not in satellite_positions:
-                continue
-            sat_pos = satellite_positions[key]
+    for sat in visible_sats:
+        key_sat_time = (sat, t_idx)
+        if key_sat_time not in satellite_positions:
+            continue
+        sat_pos = satellite_positions[key_sat_time]
+
+        rates = []
+        for user_id in user_locations:
+            user_pos = user_locations[user_id][t_idx]
             rate = compute_data_rate(sat_pos, user_pos)
-            data_rate_dict[(sat, user_id, t_idx)] = rate
+            data_rate_dict_user[(sat, user_id, t_idx)] = rate  # 個別記錄
+            rates.append(rate)
 
-# === 輸出 ===
-with open("data_rate_dict.pkl", "wb") as f:
-    pickle.dump(data_rate_dict, f)
+        avg_rate = sum(rates) / len(rates) if rates else 0.0
+        data_rate_dict_avg[(t_idx, sat)] = avg_rate
 
-print("Saved data_rate_dict.pkl with {} entries.".format(len(data_rate_dict)))
+# === 存檔
+with open("data/data_rate_dict_user.pkl", "wb") as f:
+    pickle.dump(data_rate_dict_user, f)
+with open("data/data_rate_dict_avg.pkl", "wb") as f:
+    pickle.dump(data_rate_dict_avg, f)
+
+print(f"✅ user version saved: {len(data_rate_dict_user)} entries")
+print(f"✅ avg  version saved: {len(data_rate_dict_avg)} entries")
