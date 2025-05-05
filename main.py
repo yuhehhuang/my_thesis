@@ -10,7 +10,7 @@ import performance_calculate
 from copy import deepcopy
 from dp_algo import build_full_time_expanded_graph, dp_k_handover_path_dp_style
 import os
-
+import json
 # 確保 src 資料夾有 __init__.py
 init_file = os.path.join("src", "__init__.py")
 if not os.path.exists(init_file):
@@ -132,38 +132,61 @@ def run_baseline_yens_per_K(k_col):
     return pd.DataFrame(results)
 ###############################################
 ###############################################
+def is_valid_path(path, t_start, t_end):
+    times = [ts for _, ts in path]
+    return sorted(times) == list(range(t_start, t_end + 1))
+
 def run_dp_per_K(k_col):
     print(f"\n--- Running DP for {k_col} ---")
 
     sat_load_dict = deepcopy(sat_load_dict_backup)
-    all_user_paths = []
+    active_user_paths = []  # 專門用來釋放資源
+    all_user_paths = []     # 所有有參與的 user（寫進 JSON）
     results = []
-
     for _, user in user_df.iterrows():
         user_id = int(user["user_id"])
         t_start = int(user["t_start"])
         t_end = int(user["t_end"])
+        K_val = int(user[k_col])
 
         if t_start >= len(access_matrix) or t_end >= len(access_matrix):
+            print(f"⚠️ user {user_id} skipped due to invalid t_start/t_end")
+            all_user_paths.append({
+                "user_id": user_id,
+                "K": k_col,  # ✅ 加這行
+                "path": [],
+                "t_begin": t_start,
+                "t_end": t_end,
+                "success": False,
+                "reward": 0.0,
+                "handover_count": float("inf")
+            })
+            results.append({
+                "user_id": user_id,
+                "K": k_col,
+                "K_limit": int(user[k_col]),
+                "reward": None,
+                "handover_count": float("inf"),
+                "success": False
+            })
             continue
 
-        # 清除舊任務使用的資源
+
         to_delete = []
-        for old_user in all_user_paths:
+        for old_user in active_user_paths:
             if old_user["t_end"] < t_start:
                 for (sat, ts) in old_user["path"]:
                     sat_load_dict[(sat, ts)] -= 1
                 to_delete.append(old_user)
         for u in to_delete:
-            all_user_paths.remove(u)
+            active_user_paths.remove(u)
 
-        # 準備 user_visible_sats
+        # user 在 [t_start, t_end] 中的可見衛星
         user_visible_sats = {
             row["time_slot"]: row["visible_sats"]
             for row in access_matrix[t_start:t_end + 1]
         }
 
-        # 建圖
         graph = build_full_time_expanded_graph(
             user_visible_sats=user_visible_sats,
             data_rate_dict=data_rate_dict_avg,
@@ -184,22 +207,36 @@ def run_dp_per_K(k_col):
             )
         except Exception as e:
             print(f"❌ user {user_id} DP failed: {e}")
+            path = []
+            reward = 0.0
 
         handover_count = count_handovers(path) if path else float("inf")
-        success = (path != []) and (handover_count <= max_handover)
+        success = (path != []) and is_valid_path(path, t_start, t_end) and (handover_count <= max_handover)
 
-        if success and path:
+        if success:
             for (sat, ts) in path:
                 if t_start <= ts <= t_end:
                     sat_load_dict[(sat, ts)] += 1
-
-            all_user_paths.append({
+            active_user_paths.append({
                 "user_id": user_id,
+                "K": k_col,  # ✅ 加這行
                 "path": path,
                 "t_begin": t_start,
-                "t_end": t_end
+                "t_end": t_end,
+                "success": success,
+                "reward": reward,
+                "handover_count": handover_count
             })
-
+        all_user_paths.append({
+            "user_id": user_id,
+            "K": k_col,
+            "path": path,
+            "t_begin": t_start,
+            "t_end": t_end,
+            "success": success,
+            "reward": reward,
+            "handover_count": handover_count
+        })
         results.append({
             "user_id": user_id,
             "K": k_col,
@@ -209,7 +246,8 @@ def run_dp_per_K(k_col):
             "success": success
         })
 
-    return pd.DataFrame(results)
+    return pd.DataFrame(results), all_user_paths
+
 # === Yens 跑每個 K ===
 dfs = []
 for k_col in K_columns:
@@ -220,12 +258,17 @@ df_result = pd.concat(dfs, ignore_index=True)
 df_result.to_csv("results/baseline_yens_results.csv", index=False)
 #=====DP跑每個K================
 dfs_dp = []
+all_user_paths_dp = []
 for k_col in K_columns:
-    df_k = run_dp_per_K(k_col)
+    df_k, paths_k = run_dp_per_K(k_col) 
     dfs_dp.append(df_k)
+    all_user_paths_dp.extend(paths_k)
 
 df_result_dp = pd.concat(dfs_dp, ignore_index=True)
+assert len(df_result_dp) == 500 * len(K_columns), f"⚠️ DP 結果筆數應為 {500 * len(K_columns)}，但實際為 {len(df_result_dp)}"
 df_result_dp.to_csv("results/baseline_dp_results.csv", index=False)
+with open("results/dp_user_paths.json", "w") as f:
+    json.dump(all_user_paths_dp, f, indent=2)
 # === 成功率統計(Yens) ===
 success_rate = (
     df_result.groupby("K")["success"]

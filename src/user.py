@@ -14,7 +14,7 @@ users = []
 for user_id in range(NUM_USERS):
     # --- 使用時間設定 ---
     duration = random.randint(5, 25)
-    t_start = random.randint(0, T - duration)
+    t_start = random.randint(0, T - duration - 1)  # 確保 t_end < T
     t_end = t_start + duration
 
     # --- handover 限制 ---
@@ -36,5 +36,5 @@ for user_id in range(NUM_USERS):
     users.append(row)
 
 df = pd.DataFrame(users)
-df.to_csv("user_info_with_Ks.csv", index=False)
+df.to_csv("data/user_info_with_Ks.csv", index=False)
 print("✅ user_info_with_Ks.csv 產生成功，包含 lat/lon")

@@ -73,18 +73,19 @@ culmulated reward => float
             for s_prev in graph[t][s_now]["prev_candidates"]:  # 從 t-1 轉移過來的衛星
                 for k in range(K + 1):  # 嘗試所有 k（目前手上這格的 k）
 
-                    # Case I: No handover
+# Case I: No handover
                     if s_now == s_prev:
                         reward = dp[t - 1][s_prev][k] + graph[t][s_now]["reward"]
-                        print(f"[t={t}] No handover: {s_prev} -> {s_now} @ k={k}, reward = {reward}")
-                        dp[t][s_now][k] = max(dp[t][s_now][k], reward)
-                        path[t][s_now][k] = s_prev
+                        if reward > dp[t][s_now][k]:
+                            dp[t][s_now][k] = reward
+                            path[t][s_now][k] = s_prev
 
                     # Case II: Handover
                     elif k > 0:
                         reward = dp[t - 1][s_prev][k - 1] + graph[t][s_now]["reward"]
-                        dp[t][s_now][k] = max(dp[t][s_now][k], reward)
-                        path[t][s_now][k] = s_prev
+                        if reward > dp[t][s_now][k]:
+                            dp[t][s_now][k] = reward
+                            path[t][s_now][k] = s_prev
 
     # 從 t_end 找出最大 reward 與終點
     best_reward = -1
@@ -96,11 +97,10 @@ culmulated reward => float
                 best_reward = dp[t_end][s][k]
                 best_end = s
                 best_k = k
-    # 回推路徑
+        # 回推路徑
     best_path = []
     if best_end is None:
-        return [], 0.0  # 若找不到合法終點，就直接回傳空路徑
-
+        return [], 0.0
     t = t_end
     s = best_end
     k = best_k
@@ -113,6 +113,8 @@ culmulated reward => float
             k -= 1
         s = s_prev
         t -= 1
-
     best_path.reverse()
+    # 允許 t_start 到 t_end 每個時間點都要剛好在 path 中
+    if len(best_path) != (t_end - t_start + 1):
+        return [], 0.0
     return best_path, best_reward

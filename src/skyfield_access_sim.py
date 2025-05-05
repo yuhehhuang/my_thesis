@@ -12,7 +12,7 @@ START_TIME_UTC = datetime(2025, 4, 21, 0, 0, 0, tzinfo=utc)
 SLOTS = 96
 SLOT_INTERVAL_MIN = 1
 MAX_SAT = 7204
-OUTPUT_CSV = "access_matrix.csv"
+OUTPUT_CSV = "data/access_matrix.csv"
 
 # === 載入 TLE ===
 print("Loading TLE data...")
@@ -61,11 +61,11 @@ df.to_csv(OUTPUT_CSV, index=False)
 print(f"Saved access matrix to {OUTPUT_CSV}")
 
 # ====== 輸出 satellite_positions.pkl ======
-with open("satellite_positions.pkl", "wb") as f:
+with open("data/satellite_positions.pkl", "wb") as f:
     pickle.dump(satellite_positions, f)
 print("Saved satellite_positions.pkl")
 # ====== 輸出 all_satellite_names.csv ======
 all_satellite_names = [sat.name for sat in satellites]
 df_names = pd.DataFrame({"sat_name": all_satellite_names})
-df_names.to_csv("all_satellite_names.csv", index=False)
+df_names.to_csv("data/all_satellite_names.csv", index=False)
 print("Saved all_satellite_names.csv")
