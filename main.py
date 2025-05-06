@@ -28,7 +28,7 @@ access_matrix = df.to_dict("records")  # list of dicts 格式
   {"time_slot": 1, "visible_sats": [...]},
   ...
 ]'''
-#==========
+#========== 找臭蟲用
 
 # === user info 載入 ===
 user_df = pd.read_csv("data/user_info_with_Ks.csv")
@@ -36,8 +36,6 @@ user_df = pd.read_csv("data/user_info_with_Ks.csv")
 with open("data/data_rate_dict_user.pkl", "rb") as f:
     data_rate_dict_user = pickle.load(f)
 
-with open("data/data_rate_dict_avg.pkl", "rb") as f:
-    data_rate_dict_avg = pickle.load(f)
 # 用來記錄T時間user一共會看到哪些衛星(順便排序)
 def load_satellite_names_from_csv(csv_path):
     df = pd.read_csv(csv_path)
@@ -65,15 +63,16 @@ sat_load_dict_backup  = init_sat_load_all(
     randomize=True,
     max_background_users=150
     )
+
 K_columns = [f"K{i}" for i in range(6)]
 def count_handovers(path):
     return sum(1 for (s1, _), (s2, _) in zip(path[:-1], path[1:]) if s1 != s2)
 #######################################################################
 def run_baseline_yens_per_K(k_col):
     print(f"\n--- Running for {k_col} ---")
-
-    sat_load_dict = deepcopy(sat_load_dict_backup)
-    all_user_paths = []
+    sat_load_dict = defaultdict(int, deepcopy(sat_load_dict_backup))
+    active_user_paths = []  # 專門用來釋放資源
+    all_user_paths = []     # 全部記錄到 JSON 分析用
     results = []
 
     for _, user in user_df.iterrows():
@@ -86,15 +85,17 @@ def run_baseline_yens_per_K(k_col):
 
         # 清除舊任務使用的資源
         to_delete = []
-        for old_user in all_user_paths:
+        for old_user in active_user_paths:
             if old_user["t_end"] < t_start:
-                for (sat, ts) in old_user["path"]:
+                path = old_user.get("path")
+                if path is None:
+                    continue  # ⛔ 避免處理 None path
+                for (sat, ts) in path:
+                    if sat_load_dict[(sat, ts)] is None:
+                        sat_load_dict[(sat, ts)] = 0
                     sat_load_dict[(sat, ts)] -= 1
-                to_delete.append(old_user)
-        for u in to_delete:
-            all_user_paths.remove(u)
-
         # 建圖與 source/target nodes
+        #data_rate_dict_user u_id-> {(sat, t) -> rate}
         G = yens_algo.build_graph_for_yens(
             access_matrix, user_id, data_rate_dict_user, sat_load_dict,
             t_start, t_end, LAMBDA=10000
@@ -108,17 +109,28 @@ def run_baseline_yens_per_K(k_col):
         handover_count =count_handovers(path) if path else float("inf")
         success = handover_count <= max_handover
 
-        if success and path:
+#       # 🌟不管 success 與否，只要有 path 就要加 load
+        if path:
             for (sat, ts) in path:
                 if t_start <= ts <= t_end:
                     sat_load_dict[(sat, ts)] += 1
-
-            all_user_paths.append({
+            active_user_paths.append({
                 "user_id": user_id,
                 "path": path,
-                "t_begin": t_start,
+                "t_start": t_start,
                 "t_end": t_end
             })
+
+        # 全部 user 的結果都要記下來
+        all_user_paths.append({
+            "user_id": user_id,
+            "path": path,
+            "t_start": t_start,
+            "t_end": t_end,
+            "success": success,
+            "K": max_handover,
+            "handover_count": handover_count
+        })
 
         results.append({
             "user_id": user_id,
@@ -129,7 +141,7 @@ def run_baseline_yens_per_K(k_col):
             "success": success
         })
 
-    return pd.DataFrame(results)
+    return pd.DataFrame(results),all_user_paths  
 ###############################################
 ###############################################
 def is_valid_path(path, t_start, t_end):
@@ -153,13 +165,12 @@ def run_dp_per_K(k_col):
             print(f"⚠️ user {user_id} skipped due to invalid t_start/t_end")
             all_user_paths.append({
                 "user_id": user_id,
-                "K": k_col,  # ✅ 加這行
-                "path": [],
-                "t_begin": t_start,
+                "path": path,
+                "t_start": t_start,
                 "t_end": t_end,
-                "success": False,
-                "reward": 0.0,
-                "handover_count": float("inf")
+                "success": success,
+                "K": max_handover,
+                "handover_count": handover_count
             })
             results.append({
                 "user_id": user_id,
@@ -188,8 +199,9 @@ def run_dp_per_K(k_col):
         }
 
         graph = build_full_time_expanded_graph(
+            user_id=user_id,
             user_visible_sats=user_visible_sats,
-            data_rate_dict=data_rate_dict_avg,
+            data_rate_dict_user=data_rate_dict_user,
             load_dict=sat_load_dict,
             t_start=t_start,
             t_end=t_end
@@ -219,7 +231,7 @@ def run_dp_per_K(k_col):
                     sat_load_dict[(sat, ts)] += 1
             active_user_paths.append({
                 "user_id": user_id,
-                "K": k_col,  # ✅ 加這行
+                "K": k_col,  
                 "path": path,
                 "t_begin": t_start,
                 "t_end": t_end,
@@ -248,14 +260,19 @@ def run_dp_per_K(k_col):
 
     return pd.DataFrame(results), all_user_paths
 
-# === Yens 跑每個 K ===
-dfs = []
-for k_col in K_columns:
-    df_k = run_baseline_yens_per_K(k_col)
-    dfs.append(df_k)
+#=====Yens 跑每個 K================
+dfs_yens = []
+all_user_paths_yens = []
 
-df_result = pd.concat(dfs, ignore_index=True)
-df_result.to_csv("results/baseline_yens_results.csv", index=False)
+for k_col in K_columns:
+    df_k, paths_k = run_baseline_yens_per_K(k_col)
+    dfs_yens.append(df_k)
+    all_user_paths_yens.extend(paths_k)
+
+df_result_yens = pd.concat(dfs_yens, ignore_index=True)
+df_result_yens.to_csv("results/baseline_yens_results.csv", index=False)
+with open("results/yens_user_paths.json", "w") as f:
+    json.dump(all_user_paths_yens, f, indent=2)
 #=====DP跑每個K================
 dfs_dp = []
 all_user_paths_dp = []
@@ -271,7 +288,7 @@ with open("results/dp_user_paths.json", "w") as f:
     json.dump(all_user_paths_dp, f, indent=2)
 # === 成功率統計(Yens) ===
 success_rate = (
-    df_result.groupby("K")["success"]
+    df_result_yens.groupby("K")["success"]
     .mean()
     .reset_index()
     .rename(columns={"success": "success_rate"})

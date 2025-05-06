@@ -1,12 +1,13 @@
 
 from typing import Dict, List, Tuple
 #user_visible_sats: time slot -> List[sat]
-#data_rate_dict: (time slot,satellite) -> data rate ##所以要額外一個pkl
-#load_dict: (time slot,satellite) -> load
+#data_rate_dict_user u_id-> {(sat, t) -> rate}
+# #load_dict: (time slot,satellite) -> load
 #回傳:time->reward(此time的), prev_candidates
 def build_full_time_expanded_graph(
+    user_id: int,
     user_visible_sats: Dict[int, List[str]],
-    data_rate_dict: Dict[Tuple[int, str], float],
+    data_rate_dict_user: Dict[int, Dict[Tuple[str, int], float]],
     load_dict: Dict[Tuple[int, str], float],
     t_start: int,
     t_end: int,
@@ -23,7 +24,9 @@ def build_full_time_expanded_graph(
         graph[t] = {}
         current_sats = user_visible_sats.get(t, [])
         for s in current_sats:
-            reward = (1 - load_dict.get((t, s), 0.0)) * data_rate_dict.get((t, s), 0.0)
+            rate = data_rate_dict_user[user_id].get((s, t), 0.0)
+            load = load_dict.get((t, s), 0.0)
+            reward = (1 - load) * rate
             graph[t][s] = {
                 "reward": reward,
                 "prev_candidates": []
@@ -59,12 +62,12 @@ culmulated reward => float
         for s in graph[t]:
             dp[t][s] = {}
             path[t][s] = {}
-            for k in range(K + 1):  # ✅ 初始化所有 k
+            for k in range(K + 1): 
                 dp[t][s][k] = float("-inf")
                 path[t][s][k] = None
     # 初始化 t_start 時刻所有衛星
     for s in graph[t_start]:
-        for k in range(K + 1):  # ✅ 所有 handover 數
+        for k in range(K + 1): 
             dp[t_start][s][k] = graph[t_start][s]["reward"]
             path[t_start][s][k] = None
 

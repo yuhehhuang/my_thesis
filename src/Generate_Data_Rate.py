@@ -1,9 +1,9 @@
+ # user_id → {(sat, t) → float}
 import pandas as pd
 import pickle
 from skyfield.api import load, wgs84
 from numpy.linalg import norm
 import ast
-
 def compute_data_rate(sat_pos, user_pos):
     distance = norm(sat_pos - user_pos)
     if distance > 2000:
@@ -32,9 +32,8 @@ for _, row in user_df.iterrows():
     lon = row["lon"]
     user_locations[user_id] = [wgs84.latlon(lat, lon).at(t).position.km for t in times]
 
-# === 建立兩種 dict
-data_rate_dict_user = {}  # (sat, user_id, t) → float (for Yens)
-data_rate_dict_avg = {}   # (t, sat) → avg float   (for DP)
+# === 建立 dict
+data_rate_dict_user = {}  # user_id → {(sat, t) → float}
 
 for t_idx in range(SLOTS):
     visible_sats = access_matrix[t_idx]["visible_sats"]
@@ -48,17 +47,16 @@ for t_idx in range(SLOTS):
         for user_id in user_locations:
             user_pos = user_locations[user_id][t_idx]
             rate = compute_data_rate(sat_pos, user_pos)
-            data_rate_dict_user[(sat, user_id, t_idx)] = rate  # 個別記錄
-            rates.append(rate)
 
-        avg_rate = sum(rates) / len(rates) if rates else 0.0
-        data_rate_dict_avg[(t_idx, sat)] = avg_rate
+            if user_id not in data_rate_dict_user:
+                data_rate_dict_user[user_id] = {}
+            
+            data_rate_dict_user[user_id][(sat, t_idx)] = rate
+
+            rates.append(rate)
 
 # === 存檔
 with open("data/data_rate_dict_user.pkl", "wb") as f:
     pickle.dump(data_rate_dict_user, f)
-with open("data/data_rate_dict_avg.pkl", "wb") as f:
-    pickle.dump(data_rate_dict_avg, f)
 
 print(f"✅ user version saved: {len(data_rate_dict_user)} entries")
-print(f"✅ avg  version saved: {len(data_rate_dict_avg)} entries")
