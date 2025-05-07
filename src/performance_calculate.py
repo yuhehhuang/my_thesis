@@ -1,15 +1,16 @@
-def compute_variance_total_usage(sat_load_dict, satellites, T):
-    from collections import defaultdict
-
-    total_usage = defaultdict(int)
-    for (sat, t), usage in sat_load_dict.items():
-        if sat in satellites and 0 <= t < T:
-            total_usage[sat] += usage
-
-    ms_list = [total_usage[sat] for sat in satellites]
-    mean_m = sum(ms_list) / len(satellites)
-    variance = sum((m - mean_m) ** 2 for m in ms_list) / len(satellites)
-    return variance
+######load_by_time[t][sat]=所有usery在time t 總共使用的此sat的channel數量
+def compute_variance_total_usage(load_by_time, access_matrix, T):
+    
+    total_var = 0
+    for t in range(T):
+        visible_sats = access_matrix[t]["visible_sats"]
+        if not visible_sats:
+            continue
+        loads = [load_by_time[t].get(sat, 0) for sat in visible_sats] #抓取time t可見衛星的使用channel 數
+        avg = sum(loads) / len(loads) #time t所有可見衛星的平均使用channel 
+        var = sum((x - avg) ** 2 for x in loads) / len(loads)
+        total_var += var
+    return total_var / T
 def save_success_rate(df_result, method_name):
     success_rate = (
         df_result.groupby("K")["success"]

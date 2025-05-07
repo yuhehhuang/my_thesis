@@ -8,9 +8,10 @@ def build_full_time_expanded_graph(
     user_id: int,
     user_visible_sats: Dict[int, List[str]],
     data_rate_dict_user: Dict[int, Dict[Tuple[str, int], float]],
-    load_dict: Dict[Tuple[int, str], float],
+    load_dict: Dict[str, float],
     t_start: int,
     t_end: int,
+    max_channels  :int
 ) -> Dict[int, Dict[str, Dict]]:
     """
     建立完整 DP 用的 time-expanded graph。
@@ -25,8 +26,8 @@ def build_full_time_expanded_graph(
         current_sats = user_visible_sats.get(t, [])
         for s in current_sats:
             rate = data_rate_dict_user[user_id].get((s, t), 0.0)
-            load = load_dict.get((t, s), 0.0)
-            reward = (1 - load) * rate
+            load = load_dict.get(s, 0.0)
+            reward = (1 - load / max_channels) * rate
             graph[t][s] = {
                 "reward": reward,
                 "prev_candidates": []
@@ -37,7 +38,6 @@ def build_full_time_expanded_graph(
         for s_now in graph[t]:
             graph[t][s_now]["prev_candidates"] = [
                 s_prev for s_prev in graph[t - 1]  # 所有 t-1 的衛星
-                if True  # 若有需要可加 transition 限制
             ]
 
     return graph
@@ -55,7 +55,7 @@ culmulated reward => float
     """
     dp = {}  # dp[t][s][k] = reward
     path = {}  # path[t][s][k] = prev_s
-
+    #預設值大家都是-inf
     for t in range(t_start, t_end + 1):
         dp[t] = {}
         path[t] = {}
@@ -65,7 +65,7 @@ culmulated reward => float
             for k in range(K + 1): 
                 dp[t][s][k] = float("-inf")
                 path[t][s][k] = None
-    # 初始化 t_start 時刻所有衛星
+    # 初始化 t_start 時刻所有衛星 確保初始狀態是正確 之後數學歸納可以保證其他狀態也正確
     for s in graph[t_start]:
         for k in range(K + 1): 
             dp[t_start][s][k] = graph[t_start][s]["reward"]

@@ -4,11 +4,7 @@ import pickle
 from skyfield.api import load, wgs84
 from numpy.linalg import norm
 import ast
-def compute_data_rate(sat_pos, user_pos):
-    distance = norm(sat_pos - user_pos)
-    if distance > 2000:
-        return 0
-    return max(10, 3000 / (distance + 1))
+from compute_data_rate import compute_data_rate
 
 # === 載入資料 ===
 user_df = pd.read_csv("data/user_info_with_Ks.csv")
@@ -46,7 +42,7 @@ for t_idx in range(SLOTS):
         rates = []
         for user_id in user_locations:
             user_pos = user_locations[user_id][t_idx]
-            rate = compute_data_rate(sat_pos, user_pos)
+            rate = compute_data_rate(sat_pos, user_pos) 
 
             if user_id not in data_rate_dict_user:
                 data_rate_dict_user[user_id] = {}

@@ -1,7 +1,7 @@
 import numpy as np
 
 def compute_data_rate(sat_pos_km, user_pos_km,
-                      freq_hz=14.5e9, EIRP_dBW=22.35, bandwidth_Hz=10e6):
+                      freq_hz=14.5e9, EIRP_dBW=22.5, bandwidth_Hz=10e6):
     """
     根據衛星與使用者的三維距離，估算傳輸速率（Mbps）
     sat_pos_km, user_pos_km: [x, y, z] in kilometers
@@ -16,13 +16,13 @@ def compute_data_rate(sat_pos_km, user_pos_km,
 
     # 接收功率 Pr = EIRP - PL
     P_r_dBW = EIRP_dBW - PL_dB
-
-    # 熵噪聲功率
-    noise_power_dBW = -174 + 10 * np.log10(bandwidth_Hz)  # dBm --> dBW
-    SNR_linear = 10 ** ((P_r_dBW - noise_power_dBW) / 10)
-
-    # 資料率（Shannon Capacity）
+    P_r_dBm = P_r_dBW + 30
+    # 熵噪聲功率（dBm）
+    noise_power_dBm = -174 + 10 * np.log10(bandwidth_Hz)
+    # SNR (linear)
+    SNR_linear = 10 ** ((P_r_dBm - noise_power_dBm) / 10)
+    # Shannon capacity
     capacity_bps = bandwidth_Hz * np.log2(1 + SNR_linear)
     capacity_mbps = capacity_bps / 1e6
 
-    return capacity_mbps
+    return capacity_mbps 
