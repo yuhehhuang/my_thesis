@@ -83,7 +83,7 @@ culmulated reward => float
                             dp[t][s_now][k] = reward
                             path[t][s_now][k] = s_prev
 
-                    # Case II: Handover
+# Case II: Handover
                     elif k > 0:
                         reward = dp[t - 1][s_prev][k - 1] + graph[t][s_now]["reward"]
                         if reward > dp[t][s_now][k]:

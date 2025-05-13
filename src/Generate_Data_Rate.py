@@ -4,7 +4,7 @@ import pickle
 from skyfield.api import load, wgs84
 from numpy.linalg import norm
 import ast
-from compute_data_rate import compute_data_rate
+import compute_data_rate 
 
 # === 載入資料 ===
 user_df = pd.read_csv("data/user_info_with_Ks.csv")
@@ -42,7 +42,8 @@ for t_idx in range(SLOTS):
         rates = []
         for user_id in user_locations:
             user_pos = user_locations[user_id][t_idx]
-            rate = compute_data_rate(sat_pos, user_pos) 
+            # 計算 C/N 與對應 spectral efficiency（bps/Hz）
+            rate = compute_data_rate.compute_data_rate(sat_pos, user_pos) 
 
             if user_id not in data_rate_dict_user:
                 data_rate_dict_user[user_id] = {}

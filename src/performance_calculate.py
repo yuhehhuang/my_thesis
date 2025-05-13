@@ -1,16 +1,31 @@
-######load_by_time[t][sat]=所有usery在time t 總共使用的此sat的channel數量
-def compute_variance_total_usage(load_by_time, access_matrix, T):
-    
+######load_by_user_time:Dict[user_id][t][sat]
+from collections import defaultdict
+def compute_variance_latest_snapshot(
+    load_by_user_time,     # Dict[user_id][t][sat]
+    access_matrix,         # time slot → visible_sats
+    T,                     # 總時間長度
+    latest_user_for_t      # Dict[t] → 最後一個處理該 t 的 user_id
+):
     total_var = 0
+    valid_t = 0
+
     for t in range(T):
         visible_sats = access_matrix[t]["visible_sats"]
-        if not visible_sats:
+        if not visible_sats or t not in latest_user_for_t:
             continue
-        loads = [load_by_time[t].get(sat, 0) for sat in visible_sats] #抓取time t可見衛星的使用channel 數
-        avg = sum(loads) / len(loads) #time t所有可見衛星的平均使用channel 
+
+        user_id = latest_user_for_t[t]
+        snapshot = load_by_user_time.get(user_id, {}).get(t, {})
+        if not snapshot:
+            continue
+
+        loads = [snapshot.get(sat, 0) for sat in visible_sats]
+        avg = sum(loads) / len(loads)
         var = sum((x - avg) ** 2 for x in loads) / len(loads)
         total_var += var
-    return total_var / T
+        valid_t += 1
+
+    return total_var / valid_t if valid_t else 0
 def save_success_rate(df_result, method_name):
     success_rate = (
         df_result.groupby("K")["success"]
