@@ -6,7 +6,7 @@ def compute_variance_total_usage(load_by_time, access_matrix, T):
         visible_sats = access_matrix[t]["visible_sats"]
         if not visible_sats:
             continue
-        loads = [load_by_time[t].get(sat, 0) for sat in visible_sats] #抓取time t可見衛星的使用channel 數
+        loads = [load_by_time.get(t, {}).get(sat, 0) for sat in visible_sats] #抓取time t可見衛星的使用channel 數
         avg = sum(loads) / len(loads) #time t所有可見衛星的平均使用channel 
         var = sum((x - avg) ** 2 for x in loads) / len(loads)
         total_var += var
