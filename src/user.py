@@ -68,7 +68,7 @@ for group_id in range(NUM_GROUPS):
             "t_end": t_end
         }
         for K in range(6):
-            row[f"K{K}"] = K + (duration // 3) + 3
+            row[f"K{K}"] = K + (duration // 3) + 5
 
         # --- 隨機經緯度產生（半徑 0.8km 內） ---
         angle = random.uniform(0, 360)

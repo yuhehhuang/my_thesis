@@ -66,7 +66,7 @@ sat_load_dict_backup  = init_sat_load_all(
     max_background_users=100
     )
 
-K_columns = [f"K{i}" for i in range(3)]
+K_columns = [f"K{i}" for i in range(5)]
 def count_handovers(path):
     return sum(1 for (s1, _), (s2, _) in zip(path[:-1], path[1:]) if s1 != s2)
 #######################################################################
@@ -359,6 +359,7 @@ def run_proposed_per_K(k_col: str):
 
 ########################比較用#######################
 timing_records = []
+variance_records = []
 #=====Yens 跑每個 K================
 dfs_yens = []
 all_user_paths_yens = []
@@ -378,6 +379,11 @@ for k_col in K_columns:
     all_user_paths_yens.extend(paths_k)
     avg_var = performance_calculate.compute_variance_total_usage(load_by_time_k, access_matrix, T=len(access_matrix))
     print(f"✅ Yens平均負載變異數 for {k_col}: {avg_var:.2f}")
+    variance_records.append({
+        "K": k_col,
+        "method": "Yens",
+        "avg_variance": avg_var
+    })
     # ========= 紀錄 user throughput =========
     for path_entry in paths_k:
         user_id = path_entry["user_id"]
@@ -446,6 +452,11 @@ for k_col in K_columns:
     all_user_paths_dp.extend(paths_k)
     avg_var = performance_calculate.compute_variance_total_usage(load_by_time_k, access_matrix, T=len(access_matrix))
     print(f"✅ 平均負載變異數 for {k_col}: {avg_var:.2f}")
+    variance_records.append({
+        "K": k_col,
+        "method": "DP",
+        "avg_variance": avg_var
+    })
     # ========= 在每個 K 下記錄 user 的 throughput =========
     for path_entry in paths_k: #paths_k=user_id, path, t_start, t_end, success, reward, handover_count
         user_id = path_entry["user_id"]
@@ -507,7 +518,11 @@ for k_col in K_columns:
 
     avg_var = performance_calculate.compute_variance_total_usage(load_by_time_k, access_matrix, T=len(access_matrix))
     print(f"✅ Proposed 平均負載變異數 for {k_col}: {avg_var:.2f}")
-
+    variance_records.append({
+        "K": k_col,
+        "method": "PROPOSED",
+        "avg_variance": avg_var
+    })
     for path_entry in paths_k:
         user_id = path_entry["user_id"]
         path = path_entry["path"]
@@ -573,15 +588,29 @@ for k_col in K_columns:
     avg_var = performance_calculate.compute_variance_total_usage(load_by_time_k, access_matrix, T=len(access_matrix))
 
     print(f"✅ TPB 平均負載變異數 for {k_col}: {avg_var:.2f}")
-
+    variance_records.append({
+        "K": k_col,
+        "method": "TPB",
+        "avg_variance": avg_var
+    })
     for path_entry in paths_k:
         user_id = path_entry["user_id"]
-        path = path_entry["path"]
+        k = k_col
         user_throughput = {}
-        for sat_id, t in path:
-            rate = data_rate_dict_user.get(user_id, {}).get((sat_id, t), 0.0)
-            user_throughput[t] = rate
-        all_user_throughput_tpb[(user_id, k_col)] = user_throughput
+
+        if not path_entry["success"]:
+            # 任務失敗 → 每個 t 都設為 0（也可以不記）
+            t_start = path_entry["t_begin"]
+            t_end = path_entry["t_end"]
+            for t in range(t_start, t_end + 1):
+                user_throughput[t] = 0.0
+        else:
+            path = path_entry["path"]
+            for sat_id, t in path:
+                rate = data_rate_dict_user.get(user_id, {}).get((sat_id, t), 0.0)
+                user_throughput[t] = rate
+
+        all_user_throughput_tpb[(user_id, k)] = user_throughput
 
 # 計算每位 user 的平均 throughput
 for (user_id, k_col), throughput_dict in all_user_throughput_tpb.items():
@@ -641,16 +670,30 @@ for k_col in K_columns:
         load_by_time_k, access_matrix, T=len(access_matrix)
     )
     print(f"✅ LBB 平均負載變異數 for {k_col}: {avg_var:.2f}")
-
+    variance_records.append({
+        "K": k_col,
+        "method": "LBB",
+        "avg_variance": avg_var
+    })
     # 每個 user 的 throughput 記錄
     for path_entry in paths_k:
         user_id = path_entry["user_id"]
-        path = path_entry["path"]
+        k = k_col
         user_throughput = {}
-        for sat_id, t in path:
-            rate = data_rate_dict_user.get(user_id, {}).get((sat_id, t), 0.0)
-            user_throughput[t] = rate
-        all_user_throughput_lbb[(user_id, k_col)] = user_throughput
+
+        if not path_entry["success"]:
+            # 任務失敗 → 每個 t 都設為 0（也可以不記）
+            t_start = path_entry["t_begin"]
+            t_end = path_entry["t_end"]
+            for t in range(t_start, t_end + 1):
+                user_throughput[t] = 0.0
+        else:
+            path = path_entry["path"]
+            for sat_id, t in path:
+                rate = data_rate_dict_user.get(user_id, {}).get((sat_id, t), 0.0)
+                user_throughput[t] = rate
+
+        all_user_throughput_lbb[(user_id, k)] = user_throughput
 
 # 計算每位 user 的平均 throughput
 for (user_id, k_col), throughput_dict in all_user_throughput_lbb.items():
@@ -698,7 +741,7 @@ for k_col in K_columns:
 
     timing_records.append({
         "K": k_col,
-        "method": "DURA",
+        "method": "SDB",
         "time_sec": dura_time
     })
 
@@ -709,17 +752,31 @@ for k_col in K_columns:
     avg_var = performance_calculate.compute_variance_total_usage(
         load_by_time_k, access_matrix, T=len(access_matrix)
     )
-    print(f"✅ DURA 平均負載變異數 for {k_col}: {avg_var:.2f}")
-
+    print(f"✅ SDB 平均負載變異數 for {k_col}: {avg_var:.2f}")
+    variance_records.append({
+        "K": k_col,
+        "method": "SDB",
+        "avg_variance": avg_var
+    })
     # 每 user 的 throughput 記錄
     for path_entry in paths_k:
         user_id = path_entry["user_id"]
-        path = path_entry["path"]
+        k = k_col
         user_throughput = {}
-        for sat_id, t in path:
-            rate = data_rate_dict_user.get(user_id, {}).get((sat_id, t), 0.0)
-            user_throughput[t] = rate
-        all_user_throughput_dura[(user_id, k_col)] = user_throughput
+
+        if not path_entry["success"]:
+            # 任務失敗 → 每個 t 都設為 0（也可以不記）
+            t_start = path_entry["t_begin"]
+            t_end = path_entry["t_end"]
+            for t in range(t_start, t_end + 1):
+                user_throughput[t] = 0.0
+        else:
+            path = path_entry["path"]
+            for sat_id, t in path:
+                rate = data_rate_dict_user.get(user_id, {}).get((sat_id, t), 0.0)
+                user_throughput[t] = rate
+
+        all_user_throughput_dura[(user_id, k)] = user_throughput
 
 # 計算平均 throughput per user
 for (user_id, k_col), throughput_dict in all_user_throughput_dura.items():
@@ -815,7 +872,7 @@ success_rate_dura = (
 )
 success_rate_dura["success_rate"] = (success_rate_dura["success_rate"] * 100).round(2)
 
-print("\n✅ DURA 每個 K 值的成功率 (%):")
+print("\n✅SDB 每個 K 值的成功率 (%):")
 print(success_rate_dura)
 
 success_rate_dura.to_csv("results/dura_success_rate.csv", index=False)
@@ -823,3 +880,8 @@ success_rate_lbb.to_csv("results/lbb_success_rate.csv", index=False)
 # === 儲存所有的時間紀錄 ===
 df_timing = pd.DataFrame(timing_records)
 df_timing.to_csv("results/running_time_per_k.csv", index=False)
+# === variance 統計 ===
+df_var = pd.DataFrame(variance_records)
+df_var.to_csv("results/variance_by_method.csv", index=False)
+print("✅ 變異數結果已寫入 results/variance_by_method.csv")
+##############  draw ###################

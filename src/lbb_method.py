@@ -94,7 +94,7 @@ def run_load_balance_based_single_slot(
             "K": k_col,
             "K_limit": K_limit,
             "reward": reward if success else None,
-            "handover_count": handover_count if success else float("inf"),
+            "handover_count": handover_count ,
             "success": success
         })
 
