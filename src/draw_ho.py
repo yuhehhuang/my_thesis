@@ -13,7 +13,8 @@ method_to_file = {
     "PROPOSED": "results/baseline_proposed_results.csv",
     "TPB": "results/baseline_tpb_results.csv",
     "LBB": "results/baseline_lbb_results.csv",
-    "SDB": "results/baseline_dura_results.csv"
+    "SDB": "results/baseline_dura_results.csv",
+    "MSLB": "results/mslb_results.csv"
 }
 
 K_list = ["K0", "K1", "K2","K3", "K4"]
@@ -43,7 +44,7 @@ for i, method in enumerate(ho_summary.columns):
 plt.xticks(x + bar_width * (len(ho_summary.columns) - 1) / 2, K_list)
 plt.xlabel("K")
 plt.ylabel("Average Handover Count")
-plt.title("Average Handover Count vs K (Bar Chart)")
+plt.title("Average Handover Count vs K ")
 plt.legend()
 plt.grid(True, axis="y", alpha=0.3)
 plt.tight_layout()

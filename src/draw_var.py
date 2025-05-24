@@ -11,7 +11,7 @@ methods = df["method"].unique()
 # 給每個方法一個 marker
 method_markers = {
     "Yens": "o", "DP": "s", "PROPOSED": "D",
-    "TPB": "^", "LBB": "v", "SDB": "P"
+    "TPB": "^", "LBB": "v", "SDB": "P","MSLB": "X" 
 }
 
 plt.figure(figsize=(10, 6))

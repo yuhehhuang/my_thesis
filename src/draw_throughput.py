@@ -55,6 +55,7 @@ method_to_prefix = {
     "TPB": "results/tpb_avg_throughput_per_user.csv",
     "LBB": "results/lbb_avg_throughput_per_user.csv",
     "SDB" : "results/dura_avg_throughput_per_user.csv",
+    "MSLB" : "results/mslb_avg_throughput_per_user.csv"
 }
 K_list = ["K0", "K1", "K2","K3", "K4"]
 plot_throughput_per_K(method_to_prefix, K_list)        

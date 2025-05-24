@@ -8,7 +8,8 @@ method_to_file = {
     "PROPOSED": "results/proposed_success_rate.csv",
     "TPB": "results/tpb_success_rate.csv",
     "LBB": "results/lbb_success_rate.csv",
-    "SDB": "results/dura_success_rate.csv"
+    "SDB": "results/dura_success_rate.csv",
+    "MSLB": "results/mslb_success_rate.csv"
 }
 
 # 指定 marker 形狀
@@ -18,7 +19,8 @@ method_markers = {
     "PROPOSED": "D",
     "TPB": "^",
     "LBB": "v",
-    "SDB": "P"
+    "SDB": "P",
+    "MSLB": "X"
 }
 
 # 畫圖

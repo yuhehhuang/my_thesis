@@ -10,7 +10,7 @@ methods = df["method"].unique()
 
 # 指定 marker
 method_markers = {
-    "Yens": "o", "DP": "s", "PROPOSED": "D", "TPB": "^", "LBB": "v", "DURA": "P"
+    "Yens": "o", "DP": "s", "PROPOSED": "D", "TPB": "^", "LBB": "v", "DURA": "P","MSLB": "X"
 }
 
 plt.figure(figsize=(10, 6))
@@ -30,5 +30,5 @@ plt.title("Running Time vs K for Different Methods")
 plt.legend()
 plt.grid(True, alpha=0.3)
 plt.tight_layout()
-plt.savefig("results/running_time_vs_K.png")
+plt.savefig("results/running_time_vs_K_backup.png")
 plt.show()

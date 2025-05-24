@@ -10,6 +10,7 @@ from copy import deepcopy
 import time
 import os
 import json
+import networkx as nx
 import yens_algo
 import dp_algo
 import performance_calculate
@@ -17,6 +18,8 @@ from proposed_method import run_proposed_method_for_user
 import tpb_method
 import lbb_method
 import sdb_method
+import mslb
+#================================================
 init_file = os.path.join("src", "__init__.py")
 if not os.path.exists(init_file):
     with open(init_file, "w"):
@@ -391,14 +394,14 @@ for k_col in K_columns:
         handover_count = path_entry.get("handover_count", 0)
         handover_limit = user_df.loc[user_id, k_col]
         user_throughput = {}
-
-        if handover_count > handover_limit:
-            # 超出 handover 限制，全部 throughput 當作 0
-            for _, t in path:
-                user_throughput[t] = 0.0
-        else:
-            # 正常計算 throughput
-            for sat_id, t in path:
+        handover_seen = 0
+        for i in range(len(path)):
+            if i > 0 and path[i][0] != path[i - 1][0]:
+                handover_seen += 1
+            sat_id, t = path[i]
+            if handover_seen > handover_limit:
+                user_throughput[t] = 0.0  # 超過 handover 限制的 slot 設為 0
+            else:
                 throughput = data_rate_dict_user.get(user_id, {}).get((sat_id, t), 0.0)
                 user_throughput[t] = throughput
 
@@ -597,18 +600,26 @@ for k_col in K_columns:
         user_id = path_entry["user_id"]
         k = k_col
         user_throughput = {}
+        path = path_entry["path"] 
+        t_start = path_entry["t_begin"]
+        t_end = path_entry["t_end"]
+        handover_count = path_entry["handover_count"]
+        handover_limit = user_df.loc[user_id, k_col]
 
-        if not path_entry["success"]:
-            # 任務失敗 → 每個 t 都設為 0（也可以不記）
-            t_start = path_entry["t_begin"]
-            t_end = path_entry["t_end"]
+        if not path:
             for t in range(t_start, t_end + 1):
                 user_throughput[t] = 0.0
         else:
-            path = path_entry["path"]
-            for sat_id, t in path:
-                rate = data_rate_dict_user.get(user_id, {}).get((sat_id, t), 0.0)
-                user_throughput[t] = rate
+            handover_seen = 0
+            for i in range(len(path)):
+                if i > 0 and path[i][0] != path[i - 1][0]:
+                    handover_seen += 1
+                sat_id, t = path[i]
+                if handover_seen > handover_limit:
+                    user_throughput[t] = 0.0
+                else:
+                    rate = data_rate_dict_user.get(user_id, {}).get((sat_id, t), 0.0)
+                    user_throughput[t] = rate
 
         all_user_throughput_tpb[(user_id, k)] = user_throughput
 
@@ -680,21 +691,28 @@ for k_col in K_columns:
         user_id = path_entry["user_id"]
         k = k_col
         user_throughput = {}
+        path = path_entry["path"] 
+        t_start = path_entry["t_begin"]
+        t_end = path_entry["t_end"]
+        handover_count = path_entry["handover_count"]
+        handover_limit = user_df.loc[user_id, k_col]
 
-        if not path_entry["success"]:
-            # 任務失敗 → 每個 t 都設為 0（也可以不記）
-            t_start = path_entry["t_begin"]
-            t_end = path_entry["t_end"]
+        if not path:
             for t in range(t_start, t_end + 1):
                 user_throughput[t] = 0.0
         else:
-            path = path_entry["path"]
-            for sat_id, t in path:
-                rate = data_rate_dict_user.get(user_id, {}).get((sat_id, t), 0.0)
-                user_throughput[t] = rate
+            handover_seen = 0
+            for i in range(len(path)):
+                if i > 0 and path[i][0] != path[i - 1][0]:
+                    handover_seen += 1
+                sat_id, t = path[i]
+                if handover_seen > handover_limit:
+                    user_throughput[t] = 0.0
+                else:
+                    rate = data_rate_dict_user.get(user_id, {}).get((sat_id, t), 0.0)
+                    user_throughput[t] = rate
 
         all_user_throughput_lbb[(user_id, k)] = user_throughput
-
 # 計算每位 user 的平均 throughput
 for (user_id, k_col), throughput_dict in all_user_throughput_lbb.items():
     total = sum(throughput_dict.values())
@@ -763,18 +781,26 @@ for k_col in K_columns:
         user_id = path_entry["user_id"]
         k = k_col
         user_throughput = {}
+        path = path_entry["path"] 
+        t_start = path_entry["t_begin"]
+        t_end = path_entry["t_end"]
+        handover_count = path_entry["handover_count"]
+        handover_limit = user_df.loc[user_id, k_col]
 
-        if not path_entry["success"]:
-            # 任務失敗 → 每個 t 都設為 0（也可以不記）
-            t_start = path_entry["t_begin"]
-            t_end = path_entry["t_end"]
+        if not path:
             for t in range(t_start, t_end + 1):
                 user_throughput[t] = 0.0
         else:
-            path = path_entry["path"]
-            for sat_id, t in path:
-                rate = data_rate_dict_user.get(user_id, {}).get((sat_id, t), 0.0)
-                user_throughput[t] = rate
+            handover_seen = 0
+            for i in range(len(path)):
+                if i > 0 and path[i][0] != path[i - 1][0]:
+                    handover_seen += 1
+                sat_id, t = path[i]
+                if handover_seen > handover_limit:
+                    user_throughput[t] = 0.0
+                else:
+                    rate = data_rate_dict_user.get(user_id, {}).get((sat_id, t), 0.0)
+                    user_throughput[t] = rate
 
         all_user_throughput_dura[(user_id, k)] = user_throughput
 
@@ -804,7 +830,153 @@ df_result_dura.to_csv("results/baseline_dura_results.csv", index=False)
 
 with open("results/dura_user_paths.json", "w") as f:
     json.dump(all_user_paths_dura, f, indent=2)
+############################# mslb method #####################################
+dfs_mslb = []
+all_user_paths_mslb = []
+all_user_throughput_mslb = {}  # (user_id, K) -> {t: throughput}
+avg_throughput_per_user_mslb = []
 
+for k_col in K_columns:
+    print(f"\n--- Running MSLB for {k_col} ---")
+    start = time.time()
+    sat_load_dict = defaultdict(int, deepcopy(sat_load_dict_backup))
+    active_user_paths = []  # ✅ 為了釋放 load
+    user_results = []
+    load_by_time_k = defaultdict(lambda: defaultdict(int))  # ✅ 記錄時間點負載
+
+    for _, user in user_df.iterrows():
+        user_id = int(user["user_id"])
+        t_start = int(user["t_start"])
+        t_end = int(user["t_end"])
+        handover_limit = int(user[k_col])
+
+        # === ✅ Step 1: 清除過期使用者的佔用 load
+        to_delete = []
+        for old_user in active_user_paths:
+            if old_user["t_end"] < t_start:
+                path = old_user.get("path", [])
+                usage_count = Counter(s for s, _ in path)
+                for sat, count in usage_count.items():
+                    sat_load_dict[sat] = max(0, sat_load_dict[sat] - count)
+                for sat, t in path:
+                    load_by_time_k[t][sat] = max(0, load_by_time_k[t].get(sat, 0) - 1)
+                to_delete.append(old_user)
+        for u in to_delete:
+            active_user_paths.remove(u)
+
+        # === ✅ Step 2: 建圖並找最短路徑
+        G = mslb.build_graph_for_user(
+            user_id=user_id,
+            t_start=t_start,
+            t_end=t_end,
+            access_matrix=access_matrix,
+            data_rate_dict_user=data_rate_dict_user,
+            sat_load_dict=sat_load_dict,
+            tau=1.0
+        )
+
+        path_nodes = nx.shortest_path(G, source="START", target="END", weight="weight")[1:-1]
+        path = [(node.split("@")[0], int(node.split("@")[1])) for node in path_nodes]
+        handover_count = sum(1 for i in range(1, len(path)) if path[i][0] != path[i - 1][0])
+        success = handover_count <= handover_limit
+        # === ✅ Step 3: 計算 throughput
+        user_throughput = {}
+        handover_seen = 0
+        reward = 0.0
+
+        if not path:
+            for t in range(t_start, t_end + 1):
+                user_throughput[t] = 0.0
+            reward = None
+        else:
+            for i in range(len(path)):
+                if i > 0 and path[i][0] != path[i - 1][0]:
+                    handover_seen += 1
+                sat_id, t = path[i]
+                if handover_seen > handover_limit:
+                    user_throughput[t] = 0.0
+                else:
+                    rate = data_rate_dict_user.get(user_id, {}).get((sat_id, t), 0.0)
+                    user_throughput[t] = rate
+                    reward += rate
+        # === ✅ Step 4: 紀錄結果
+        all_user_paths_mslb.append({
+            "user_id": user_id,
+            "path": path,
+            "t_start": t_start,
+            "t_end": t_end,
+            "success": success,
+            "K": handover_limit,
+            "reward": reward,
+            "handover_count": handover_count
+        })
+
+        user_results.append({
+            "user_id": user_id,
+            "K": k_col,
+            "K_limit": handover_limit,
+            "reward": reward,
+            "handover_count": handover_count,
+            "success": success
+        })
+        all_user_throughput_mslb[(user_id, k_col)] = user_throughput
+        # === ✅ Step 4: 更新負載（sat_load_dict、load_by_time）
+        if path:
+            for sat, t in path:
+                sat_load_dict[sat] += 1
+                load_by_time_k[t][sat] += 1
+            active_user_paths.append({
+                "user_id": user_id,
+                "t_end": t_end,
+                "path": path
+            })
+    end = time.time()
+    mslb_time = end - start
+    timing_records.append({
+        "K": k_col,
+        "method": "MSLB",
+        "time_sec": mslb_time
+    })
+
+    avg_var = performance_calculate.compute_variance_total_usage(load_by_time_k, access_matrix, T=len(access_matrix))
+    variance_records.append({
+        "K": k_col,
+        "method": "MSLB",
+        "avg_variance": avg_var
+    })
+    print(f"✅ MSLB 平均負載變異數 for {k_col}: {avg_var:.2f}")
+
+    df_k = pd.DataFrame(user_results)
+    dfs_mslb.append(df_k)
+    all_user_paths_mslb.extend(user_results)
+
+# === 平均 throughput 統計
+for (user_id, k_col), throughput_dict in all_user_throughput_mslb.items():
+    total = sum(throughput_dict.values())
+    count = len(throughput_dict)
+    avg = total / count if count > 0 else 0.0
+    avg_throughput_per_user_mslb.append({
+        "user_id": user_id,
+        "K": k_col,
+        "avg_throughput": avg
+    })
+
+df_avg_throughput = pd.DataFrame(avg_throughput_per_user_mslb)
+df_result_mslb = pd.concat(dfs_mslb, ignore_index=True)
+
+# === 儲存
+with open("results/mslb_user_throughput.json", "w") as f:
+    json.dump([
+        {"user_id": user_id, "K": k, "throughput_per_slot": d}
+        for (user_id, k), d in all_user_throughput_mslb.items()
+    ], f, indent=2)
+
+df_avg_throughput.to_csv("results/mslb_avg_throughput_per_user.csv", index=False)
+df_result_mslb.to_csv("results/mslb_results.csv", index=False)
+
+with open("results/mslb_user_paths.json", "w") as f:
+    json.dump(all_user_paths_mslb, f, indent=2)
+#############################
 # === 成功率統計(Yens) ===
 success_rate = (
     df_result_yens.groupby("K")["success"]
@@ -877,6 +1049,19 @@ print(success_rate_dura)
 
 success_rate_dura.to_csv("results/dura_success_rate.csv", index=False)
 success_rate_lbb.to_csv("results/lbb_success_rate.csv", index=False)
+# === 成功率統計 (MSLB) ===
+success_rate_mslb = (
+    df_result_mslb.groupby("K")["success"]
+    .mean()
+    .reset_index()
+    .rename(columns={"success": "success_rate"})
+)
+success_rate_mslb["success_rate"] = (success_rate_mslb["success_rate"] * 100).round(2)
+
+print("\n✅ MSLB 每個 K 值的成功率 (%):")
+print(success_rate_mslb)
+
+success_rate_mslb.to_csv("results/mslb_success_rate.csv", index=False)
 # === 儲存所有的時間紀錄 ===
 df_timing = pd.DataFrame(timing_records)
 df_timing.to_csv("results/running_time_per_k.csv", index=False)
